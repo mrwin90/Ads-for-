@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskRain BD - Earn Money</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <style>
+        :root { --primary: #1c2a35; --card: #243447; --accent: #ffd700; --blue: #0088cc; --success: #27ae60; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--primary); color: white; margin: 0; padding: 15px; text-align: center; }
+        .card { background: var(--card); border-radius: 15px; padding: 20px; margin-bottom: 15px; border: 1px solid #34495e; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .balance { font-size: 32px; color: var(--accent); font-weight: bold; margin: 10px 0; }
+        .btn { background: var(--blue); border: none; color: white; padding: 14px; border-radius: 12px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; transition: 0.3s; margin-top: 5px; }
+        
+        /* রেফারেল স্টাইল */
+        .refer-box { background: #fdf2e9; color: #333; border-radius: 12px; padding: 15px; text-align: left; border-left: 5px solid #e67e22; }
+        .refer-link { background: white; padding: 8px; border-radius: 8px; border: 1px solid #ddd; font-size: 12px; color: #555; word-break: break-all; margin-top: 5px; }
+
+        /* লিডারবোর্ড স্টাইল */
+        .leader-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #34495e; font-size: 14px; }
+        .rank { color: var(--accent); font-weight: bold; margin-right: 10px; }
+
+        /* লাইভ ফেক পেমেন্ট পপ-আপ */
+        #payout-toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(150%);
+            background: rgba(39, 174, 96, 0.95); color: white; padding: 10px 20px; border-radius: 50px;
+            font-size: 12px; z-index: 10000; transition: 0.5s; border: 1px solid white;
+        }
+
+        input, select { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #34495e; background: #1c2a35; color: white; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <div id="payout-toast">✓ <span id="toast-text">Sujon Just Withdrew ৳1500</span></div>
+
+    <div class="card">
+        <h2 style="margin:0;">TaskRain BD</h2>
+        <p id="user-info" style="font-size: 11px; color: #888;">লোড হচ্ছে...</p>
+        <div class="balance">৳ <span id="balance">0.00</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+            <span>অ্যাড: <b id="ad-count">0</b></span>
+            <span>রেফার: <b id="ref-count">0</b></span>
+        </div>
+    </div>
+
+    <div class="card refer-box">
+        <div style="font-weight: bold; color: #d35400;">🔥 আপনার পার্সোনাল রেফার লিংক:</div>
+        <div class="refer-link" id="refer-link-text">https://t.me/yourbot?start=user</div>
+        <button class="btn" style="padding:8px; font-size:12px; margin-top:10px;" onclick="copyLink()">লিংক কপি করুন</button>
+        <p style="font-size:10px; color:#666; margin-top:5px;">প্রতি রেফারে ৩০ টাকা বোনাস পাবেন!</p>
+    </div>
+
+    <div class="card">
+        <h3>📹 বিজ্ঞাপন দেখে আয়</h3>
+        <button class="btn" onclick="startAd()">বিজ্ঞাপন দেখুন</button>
+    </div>
+
+    <div class="card">
+        <h3 style="margin:0 0 10px 0; color:var(--accent);">🏆 সেরা ১০ উপার্জনকারী (Live)</h3>
+        <div id="leaderboard">
+            </div>
+    </div>
+
+    <div class="card">
+        <h3>💸 টাকা উত্তোলন</h3>
+        <select id="method">
+            <option value="Bkash">বিকাশ (Bkash)</option>
+            <option value="Nagad">নগদ (Nagad)</option>
+        </select>
+        <input type="number" id="phone" placeholder="আপনার নম্বর দিন">
+        <button class="btn" style="background:var(--success);" onclick="withdraw()">উত্তোলন রিকোয়েস্ট</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        const BOT_USER = "Online_Free_Income_09_bot"; // আপনার বটের ইউজারনেম এখানে দিন
+        const user = tg.initDataUnsafe.user || { first_name: "Guest", id: "12345" };
+
+        let bal = parseFloat(localStorage.getItem('tr_bal')) || 0;
+        let ads = parseInt(localStorage.getItem('tr_ads')) || 0;
+
+        function updateUI() {
+            document.getElementById('balance').innerText = bal.toFixed(2);
+            document.getElementById('ad-count').innerText = ads;
+            document.getElementById('user-info').innerText = `${user.first_name} (ID: ${user.id})`;
+            document.getElementById('refer-link-text').innerText = `https://t.me/${BOT_USER}?start=${user.id}`;
+            renderLeaderboard();
+        }
+
+        // লিডারবোর্ড জেনারেটর
+        function renderLeaderboard() {
+            const data = [
+                {n: "Sujon Ahmed", e: 4500}, {n: "Rohim Ali", e: 3200}, 
+                {n: user.first_name, e: bal}, {n: "Mitu Akter", e: 1200}
+            ].sort((a,b) => b.e - a.e);
+            
+            let html = '';
+            data.forEach((l, i) => {
+                html += `<div class="leader-item"><span><span class="rank">#${i+1}</span> ${l.n}</span><span>৳${l.e}</span></div>`;
+            });
+            document.getElementById('leaderboard').innerHTML = html;
+        }
+
+        // ফেক লাইভ পেমেন্ট পপ-আপ
+        function showToast() {
+            const names = ["Abir", "Rakib", "Sumaiya", "Mim", "Sabbir"];
+            const name = names[Math.floor(Math.random()*names.length)];
+            const amt = [1500, 2000, 1800][Math.floor(Math.random()*3)];
+            
+            document.getElementById('toast-text').innerText = `${name} Just Withdrew ৳${amt} via Bkash`;
+            const toast = document.getElementById('payout-toast');
+            toast.style.transform = 'translateX(-50%) translateY(0)';
+            setTimeout(() => toast.style.transform = 'translateX(-50%) translateY(150%)', 4000);
+        }
+
+        setInterval(showToast, 12000); // ১২ সেকেন্ড পর পর দেখাবে
+
+        function startAd() {
+            bal += 5; ads += 1;
+            localStorage.setItem('tr_bal', bal);
+            localStorage.setItem('tr_ads', ads);
+            updateUI();
+            tg.showAlert("✅ ৫ টাকা যোগ হয়েছে!");
+        }
+
+        function copyLink() {
+            const link = document.getElementById('refer-link-text').innerText;
+            navigator.clipboard.writeText(link);
+            tg.showAlert("✅ রেফার লিংক কপি হয়েছে!");
+        }
+
+        function withdraw() {
+            if(bal < 1500) return tg.showAlert("⚠️ ন্যূনতম ১৫০০ টাকা প্রয়োজন।");
+            tg.showAlert("✅ রিকোয়েস্ট পাঠানো হয়েছে!");
+            bal = 0; localStorage.setItem('tr_bal', 0); updateUI();
+        }
+
+        tg.expand();
+        updateUI();
+        setTimeout(showToast, 3000);
+    </script>
+</body>
+</html>
